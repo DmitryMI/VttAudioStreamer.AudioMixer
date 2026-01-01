@@ -7,7 +7,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(VttAudioStreamer.AudioMixer.Test.Sources 
-	"VttAudioStreamer/AudioMixer/Gstreamer/AudioMixerTest.cpp"
+	"VttAudioStreamer/AudioMixer/NoCodec/AudioMixerTest.cpp"
 )
 
 enable_testing()
