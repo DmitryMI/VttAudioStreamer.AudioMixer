@@ -13,5 +13,6 @@ project ("VttAudioStreamer.AudioMixer")
 
 add_subdirectory("src")
 add_subdirectory("test")
+add_subdirectory("test_app")
 
 enable_testing()

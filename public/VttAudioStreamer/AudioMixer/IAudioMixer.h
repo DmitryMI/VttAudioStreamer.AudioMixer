@@ -17,22 +17,8 @@ namespace VttAudioStreamer::AudioMixer
 	class IAudioMixer
 	{
 	public:
-		/// <summary>
-		/// Callback invoked when a new mixed audio frame is available.
-		/// </summary>
-		using OnFrameCallback = std::function<void(std::shared_ptr<IPcmFrame>)>;
 
 		virtual ~IAudioMixer() = default;
-
-		/// <summary>
-		/// Starts the audio mixer.
-		/// </summary>
-		virtual std::promise<void> Start() = 0;
-
-		/// <summary>
-		/// Stops the audio mixer.
-		/// </summary>
-		virtual std::promise<void> Stop() = 0;
 
 		/// <summary>
 		/// Fades in the specified audio tracks using the given fade configuration, if they are not already playing.
@@ -56,10 +42,13 @@ namespace VttAudioStreamer::AudioMixer
 		/// <param name="transition"></param>
 		virtual void FadeInOut(const std::vector<std::shared_ptr<IAudioTrack>>& fromTracks, const std::vector<std::shared_ptr<IAudioTrack>>& toTracks, std::shared_ptr<ITransition> transition) = 0;
 
+		virtual std::shared_ptr<IPcmConfig> GetOutputPcmConfig() const = 0;
+
 		/// <summary>
-		/// Sets a callback function to be invoked on each frame.
+		/// Mixes and retrieves a specified number of PCM audio frames.
 		/// </summary>
-		/// <param name="callback">The callback function to be called when a frame occurs.</param>
-		virtual void SetOnFrameCallback(OnFrameCallback callback) = 0;
+		/// <param name="frames">The number of PCM frames to retrieve.</param>
+		/// <returns>A shared pointer to an IPcmFrame object containing the requested frames. May contain less frames then requested.</returns>
+		virtual std::shared_ptr<IPcmFrame> GetPcmFrames(size_t frames) = 0;
 	};
 }

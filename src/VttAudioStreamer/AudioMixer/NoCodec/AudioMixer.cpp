@@ -18,54 +18,6 @@ namespace VttAudioStreamer::AudioMixer::NoCodec
 		
 	}
 
-	std::promise<void> AudioMixer::Start()
-	{
-		std::promise<void> promise;
-
-		try
-		{
-			m_isRunning = true;
-			m_mixerThread = std::thread(&AudioMixer::MixingLoop, this);
-			promise.set_value();
-		}
-		catch (const std::exception& e)
-		{
-			spdlog::error("Failed to start AudioMixer: {}", e.what());
-			promise.set_exception(std::current_exception());
-		}
-
-		return promise;
-	}
-
-	std::promise<void> AudioMixer::Stop()
-	{
-		std::promise<void> promise;
-
-		try
-		{
-			m_isRunning = false;
-
-			if (m_mixerThread.joinable())
-			{
-				m_mixerThread.join();
-			}
-
-			{
-				std::lock_guard<std::mutex> lock(m_tracksMutex);
-				m_activeTracks.clear();
-			}
-
-			promise.set_value();
-		}
-		catch (const std::exception& e)
-		{
-			spdlog::error("Failed to stop AudioMixer: {}", e.what());
-			promise.set_exception(std::current_exception());
-		}
-
-		return promise;
-	}
-
 	void AudioMixer::FadeIn(const std::vector<std::shared_ptr<IAudioTrack>>& tracks, std::shared_ptr<IFade> fade)
 	{
 		if (!fade)
@@ -173,12 +125,6 @@ namespace VttAudioStreamer::AudioMixer::NoCodec
 		}
 	}
 
-	void AudioMixer::SetOnFrameCallback(OnFrameCallback callback)
-	{
-		std::lock_guard<std::mutex> lock(m_callbackMutex);
-		m_OnFrameCallback = callback;
-	}
-
 	void AudioMixer::FetchNextFrames()
 	{
 		std::lock_guard<std::mutex> lock(m_tracksMutex);
@@ -266,54 +212,38 @@ namespace VttAudioStreamer::AudioMixer::NoCodec
 		return mixedSamples;
 	}
 
-	void AudioMixer::MixingLoop()
+	std::shared_ptr<IPcmConfig> AudioMixer::GetOutputPcmConfig() const
 	{
-		const auto frameDuration = std::chrono::milliseconds(static_cast<long long>(FRAMES_PER_BUFFER * 1000.0 / SAMPLE_RATE));
-		std::chrono::steady_clock::time_point lastFrameTime = std::chrono::steady_clock::now();
+		return m_PcmConfig;
+	}
 
-		while (m_isRunning)
+	std::shared_ptr<IPcmFrame> AudioMixer::GetPcmFrames(size_t frames)
+	{
+		auto frameDuration = std::chrono::milliseconds(frames * 1000 / SAMPLE_RATE);
+
+		std::shared_ptr<IPcmFrame> outputFrame = nullptr;
+		FetchNextFrames();
+
+		auto mixedSamples = MixAudioSamples();
+
+		if (!mixedSamples.empty())
 		{
-			auto now = std::chrono::steady_clock::now();
-			auto timeSinceLastFrame = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastFrameTime);
+			outputFrame = std::make_shared<PcmFrame>(
+				mixedSamples,
+				m_PcmConfig
+			);
+		}
 
-			if (timeSinceLastFrame < frameDuration)
+		// Update elapsed time for fade calculations
+		{
+			std::lock_guard<std::mutex> lock(m_tracksMutex);
+			for (auto& state : m_activeTracks)
 			{
-				std::this_thread::sleep_for(frameDuration - timeSinceLastFrame);
-				lastFrameTime = std::chrono::steady_clock::now();
-			}
-			else
-			{
-				lastFrameTime = now;
-			}
-
-			// Fetch next frames from all active tracks
-			FetchNextFrames();
-
-			// Mix audio samples from all active tracks
-			auto mixedSamples = MixAudioSamples();
-
-			// Create and output PCM frame
-			{
-				std::lock_guard<std::mutex> callbackLock(m_callbackMutex);
-				if (m_OnFrameCallback && !mixedSamples.empty())
-				{
-					auto pcmFrame = std::make_shared<PcmFrame>(
-						mixedSamples,
-						SAMPLE_RATE,
-						CHANNEL_COUNT
-					);
-					m_OnFrameCallback(pcmFrame);
-				}
-			}
-
-			// Update elapsed time for fade calculations
-			{
-				std::lock_guard<std::mutex> lock(m_tracksMutex);
-				for (auto& state : m_activeTracks)
-				{
-					state.elapsedTime += frameDuration;
-				}
+				state.elapsedTime += frameDuration;
 			}
 		}
+
+
+		return outputFrame;
 	}
 }

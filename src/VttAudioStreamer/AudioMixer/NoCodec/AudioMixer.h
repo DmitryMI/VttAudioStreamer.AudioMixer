@@ -28,25 +28,22 @@ namespace VttAudioStreamer::AudioMixer::NoCodec
 		AudioMixer();
 		virtual ~AudioMixer();
 
-		std::promise<void> Start() override;
-		std::promise<void> Stop() override;
 		void FadeIn(const std::vector<std::shared_ptr<IAudioTrack>>& tracks, std::shared_ptr<IFade> fade) override;
 		void FadeOut(const std::vector<std::shared_ptr<IAudioTrack>>& tracks, std::shared_ptr<IFade> fade) override;
 		void FadeInOut(const std::vector<std::shared_ptr<IAudioTrack>>& fromTracks, const std::vector<std::shared_ptr<IAudioTrack>>& toTracks, std::shared_ptr<ITransition> transition) override;
 
-		void SetOnFrameCallback(OnFrameCallback callback) override;
+		std::shared_ptr<IPcmConfig> GetOutputPcmConfig() const override;
+		std::shared_ptr<IPcmFrame> GetPcmFrames(size_t frames) override;
 
 	private:
-		void MixingLoop();
 		std::vector<float> MixAudioSamples();
 		void FetchNextFrames();
 
-		OnFrameCallback m_OnFrameCallback;
 		bool m_isRunning = false;
-		std::thread m_mixerThread;
 		std::vector<TrackState> m_activeTracks;
 		std::mutex m_tracksMutex;
-		std::mutex m_callbackMutex;
+
+		std::shared_ptr<IPcmConfig> m_PcmConfig = std::make_shared<PcmConfig>(SAMPLE_RATE, CHANNEL_COUNT);
 
 		// Audio format configuration
 		static constexpr int SAMPLE_RATE = 44100;

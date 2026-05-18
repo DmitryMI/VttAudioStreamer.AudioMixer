@@ -1,0 +1,2 @@
+add_subdirectory(VttAudioStreamer/AudioMixer/TestApp)
+add_subdirectory(MiniAudio)
